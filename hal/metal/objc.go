@@ -19,11 +19,11 @@ import (
 var (
 	objcLib unsafe.Pointer
 
-	symObjcMsgSend     unsafe.Pointer
+	symObjcMsgSend      unsafe.Pointer
 	symObjcMsgSendFpret unsafe.Pointer
 	symObjcMsgSendStret unsafe.Pointer
-	symObjcGetClass    unsafe.Pointer
-	symSelRegisterName unsafe.Pointer
+	symObjcGetClass     unsafe.Pointer
+	symSelRegisterName  unsafe.Pointer
 
 	cifGetClass    types.CallInterface
 	cifSelRegister types.CallInterface
@@ -399,6 +399,7 @@ func NewAutoreleasePool() *AutoreleasePool {
 func (p *AutoreleasePool) Drain() {
 	if p.pool != 0 {
 		_ = MsgSend(p.pool, Sel("drain"))
+		// msgSendVoid(p.pool, Sel("drain"))
 		p.pool = 0
 	}
 }

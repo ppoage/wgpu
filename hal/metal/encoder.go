@@ -371,14 +371,69 @@ func (e *RenderPassEncoder) SetPipeline(pipeline hal.RenderPipeline) {
 // SetBindGroup sets a bind group.
 func (e *RenderPassEncoder) SetBindGroup(index uint32, group hal.BindGroup, offsets []uint32) {
 	bg, ok := group.(*BindGroup)
-	if !ok || bg == nil {
+	if !ok || bg == nil || e.pipeline == nil || e.pipeline.layout == nil {
 		return
 	}
-	// Metal argument buffers would be used here for real bind group support
-	// For now, this is a simplified implementation
-	_ = bg
-	_ = index
-	_ = offsets
+	if int(index) >= len(e.pipeline.layout.offsets) {
+		return
+	}
+	if bg.layout == nil || bg.layout != e.pipeline.layout.layouts[index] {
+		return
+	}
+
+	groupOffsets := e.pipeline.layout.offsets[index]
+	for _, entry := range bg.entries {
+		info, ok := bg.layout.bindingInfo[entry.Binding]
+		if !ok {
+			continue
+		}
+		if info.visibility&types.ShaderStageCompute == 0 {
+			continue
+		}
+
+		var dynamicOffset uint64
+		if info.hasDynamicOffset {
+			if idx, ok := bg.layout.dynamicIndex[entry.Binding]; ok && idx < len(offsets) {
+				dynamicOffset = uint64(offsets[idx])
+			}
+		}
+
+		switch res := entry.Resource.(type) {
+		case types.BufferBinding:
+			buffer := ID(res.Buffer)
+			offset := res.Offset + dynamicOffset
+			if info.visibility&types.ShaderStageVertex != 0 {
+				_ = MsgSend(e.raw, Sel("setVertexBuffer:offset:atIndex:"),
+					uintptr(buffer), uintptr(offset), uintptr(groupOffsets.buffer+info.index))
+			}
+			if info.visibility&types.ShaderStageFragment != 0 {
+				_ = MsgSend(e.raw, Sel("setFragmentBuffer:offset:atIndex:"),
+					uintptr(buffer), uintptr(offset), uintptr(groupOffsets.buffer+info.index))
+			}
+
+		case types.TextureViewBinding:
+			texture := ID(res.TextureView)
+			if info.visibility&types.ShaderStageVertex != 0 {
+				_ = MsgSend(e.raw, Sel("setVertexTexture:atIndex:"),
+					uintptr(texture), uintptr(groupOffsets.texture+info.index))
+			}
+			if info.visibility&types.ShaderStageFragment != 0 {
+				_ = MsgSend(e.raw, Sel("setFragmentTexture:atIndex:"),
+					uintptr(texture), uintptr(groupOffsets.texture+info.index))
+			}
+
+		case types.SamplerBinding:
+			sampler := ID(res.Sampler)
+			if info.visibility&types.ShaderStageVertex != 0 {
+				_ = MsgSend(e.raw, Sel("setVertexSamplerState:atIndex:"),
+					uintptr(sampler), uintptr(groupOffsets.sampler+info.index))
+			}
+			if info.visibility&types.ShaderStageFragment != 0 {
+				_ = MsgSend(e.raw, Sel("setFragmentSamplerState:atIndex:"),
+					uintptr(sampler), uintptr(groupOffsets.sampler+info.index))
+			}
+		}
+	}
 }
 
 // SetVertexBuffer sets a vertex buffer.
@@ -511,12 +566,48 @@ func (e *ComputePassEncoder) SetPipeline(pipeline hal.ComputePipeline) {
 // SetBindGroup sets a bind group.
 func (e *ComputePassEncoder) SetBindGroup(index uint32, group hal.BindGroup, offsets []uint32) {
 	bg, ok := group.(*BindGroup)
-	if !ok || bg == nil {
+	if !ok || bg == nil || e.pipeline == nil || e.pipeline.layout == nil {
 		return
 	}
-	_ = bg
-	_ = index
-	_ = offsets
+	if int(index) >= len(e.pipeline.layout.offsets) {
+		return
+	}
+	if bg.layout == nil || bg.layout != e.pipeline.layout.layouts[index] {
+		return
+	}
+
+	groupOffsets := e.pipeline.layout.offsets[index]
+	for _, entry := range bg.entries {
+		info, ok := bg.layout.bindingInfo[entry.Binding]
+		if !ok {
+			continue
+		}
+
+		var dynamicOffset uint64
+		if info.hasDynamicOffset {
+			if idx, ok := bg.layout.dynamicIndex[entry.Binding]; ok && idx < len(offsets) {
+				dynamicOffset = uint64(offsets[idx])
+			}
+		}
+
+		switch res := entry.Resource.(type) {
+		case types.BufferBinding:
+			buffer := ID(res.Buffer)
+			offset := res.Offset + dynamicOffset
+			_ = MsgSend(e.raw, Sel("setBuffer:offset:atIndex:"),
+				uintptr(buffer), uintptr(offset), uintptr(groupOffsets.buffer+info.index))
+
+		case types.TextureViewBinding:
+			texture := ID(res.TextureView)
+			_ = MsgSend(e.raw, Sel("setTexture:atIndex:"),
+				uintptr(texture), uintptr(groupOffsets.texture+info.index))
+
+		case types.SamplerBinding:
+			sampler := ID(res.Sampler)
+			_ = MsgSend(e.raw, Sel("setSamplerState:atIndex:"),
+				uintptr(sampler), uintptr(groupOffsets.sampler+info.index))
+		}
+	}
 }
 
 // Dispatch dispatches compute workgroups.

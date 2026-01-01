@@ -354,3 +354,83 @@ func indexFormatToMTL(format types.IndexFormat) MTLIndexType {
 		return MTLIndexTypeUInt32
 	}
 }
+
+func vertexFormatToMTL(format types.VertexFormat) (MTLVertexFormat, bool) {
+	switch format {
+	case types.VertexFormatUint8x2:
+		return MTLVertexFormatUChar2, true
+	case types.VertexFormatUint8x4:
+		return MTLVertexFormatUChar4, true
+	case types.VertexFormatSint8x2:
+		return MTLVertexFormatChar2, true
+	case types.VertexFormatSint8x4:
+		return MTLVertexFormatChar4, true
+	case types.VertexFormatUnorm8x2:
+		return MTLVertexFormatUChar2Normalized, true
+	case types.VertexFormatUnorm8x4:
+		return MTLVertexFormatUChar4Normalized, true
+	case types.VertexFormatSnorm8x2:
+		return MTLVertexFormatChar2Normalized, true
+	case types.VertexFormatSnorm8x4:
+		return MTLVertexFormatChar4Normalized, true
+	case types.VertexFormatUint16x2:
+		return MTLVertexFormatUShort2, true
+	case types.VertexFormatUint16x4:
+		return MTLVertexFormatUShort4, true
+	case types.VertexFormatSint16x2:
+		return MTLVertexFormatShort2, true
+	case types.VertexFormatSint16x4:
+		return MTLVertexFormatShort4, true
+	case types.VertexFormatUnorm16x2:
+		return MTLVertexFormatUShort2Normalized, true
+	case types.VertexFormatUnorm16x4:
+		return MTLVertexFormatUShort4Normalized, true
+	case types.VertexFormatSnorm16x2:
+		return MTLVertexFormatShort2Normalized, true
+	case types.VertexFormatSnorm16x4:
+		return MTLVertexFormatShort4Normalized, true
+	case types.VertexFormatFloat16x2:
+		return MTLVertexFormatHalf2, true
+	case types.VertexFormatFloat16x4:
+		return MTLVertexFormatHalf4, true
+	case types.VertexFormatFloat32:
+		return MTLVertexFormatFloat, true
+	case types.VertexFormatFloat32x2:
+		return MTLVertexFormatFloat2, true
+	case types.VertexFormatFloat32x3:
+		return MTLVertexFormatFloat3, true
+	case types.VertexFormatFloat32x4:
+		return MTLVertexFormatFloat4, true
+	case types.VertexFormatUint32:
+		return MTLVertexFormatUInt, true
+	case types.VertexFormatUint32x2:
+		return MTLVertexFormatUInt2, true
+	case types.VertexFormatUint32x3:
+		return MTLVertexFormatUInt3, true
+	case types.VertexFormatUint32x4:
+		return MTLVertexFormatUInt4, true
+	case types.VertexFormatSint32:
+		return MTLVertexFormatInt, true
+	case types.VertexFormatSint32x2:
+		return MTLVertexFormatInt2, true
+	case types.VertexFormatSint32x3:
+		return MTLVertexFormatInt3, true
+	case types.VertexFormatSint32x4:
+		return MTLVertexFormatInt4, true
+	case types.VertexFormatUnorm1010102:
+		return MTLVertexFormatUInt1010102Normalized, true
+	default:
+		return MTLVertexFormatInvalid, false
+	}
+}
+
+func vertexStepModeToMTL(mode types.VertexStepMode) (MTLVertexStepFunction, bool) {
+	switch mode {
+	case types.VertexStepModeVertex:
+		return MTLVertexStepFunctionPerVertex, true
+	case types.VertexStepModeInstance:
+		return MTLVertexStepFunctionPerInstance, true
+	default:
+		return MTLVertexStepFunctionPerVertex, false
+	}
+}

@@ -100,8 +100,14 @@ func (m *ShaderModule) Destroy() {
 
 // BindGroupLayout implements hal.BindGroupLayout for Metal.
 type BindGroupLayout struct {
-	entries []types.BindGroupLayoutEntry
-	device  *Device
+	entries         []types.BindGroupLayoutEntry
+	bindingInfo     map[uint32]bindingInfo
+	dynamicBindings []uint32
+	dynamicIndex    map[uint32]int
+	bufferCount     uint32
+	textureCount    uint32
+	samplerCount    uint32
+	device          *Device
 }
 
 // Destroy releases the bind group layout.
@@ -127,7 +133,8 @@ func (g *BindGroup) Destroy() {
 
 // PipelineLayout implements hal.PipelineLayout for Metal.
 type PipelineLayout struct {
-	layouts []hal.BindGroupLayout
+	layouts []*BindGroupLayout
+	offsets []groupOffsets
 	device  *Device
 }
 
@@ -141,6 +148,7 @@ func (l *PipelineLayout) Destroy() {
 // RenderPipeline implements hal.RenderPipeline for Metal.
 type RenderPipeline struct {
 	raw    ID // id<MTLRenderPipelineState>
+	layout *PipelineLayout
 	device *Device
 }
 
@@ -154,6 +162,7 @@ func (p *RenderPipeline) Destroy() {
 // ComputePipeline implements hal.ComputePipeline for Metal.
 type ComputePipeline struct {
 	raw           ID // id<MTLComputePipelineState>
+	layout        *PipelineLayout
 	device        *Device
 	workgroupSize MTLSize // workgroup size from shader
 }

@@ -40,6 +40,8 @@ type objcArg struct {
 
 var (
 	cgSizeType = &types.TypeDescriptor{
+		Size:      16,
+		Alignment: 8,
 		Kind: types.StructType,
 		Members: []*types.TypeDescriptor{
 			types.DoubleTypeDescriptor,
@@ -47,6 +49,8 @@ var (
 		},
 	}
 	mtlClearColorType = &types.TypeDescriptor{
+		Size:      32,
+		Alignment: 8,
 		Kind: types.StructType,
 		Members: []*types.TypeDescriptor{
 			types.DoubleTypeDescriptor,
@@ -56,6 +60,8 @@ var (
 		},
 	}
 	mtlViewportType = &types.TypeDescriptor{
+		Size:      48,
+		Alignment: 8,
 		Kind: types.StructType,
 		Members: []*types.TypeDescriptor{
 			types.DoubleTypeDescriptor,
@@ -67,6 +73,8 @@ var (
 		},
 	}
 	mtlScissorRectType = &types.TypeDescriptor{
+		Size:      32,
+		Alignment: 8,
 		Kind: types.StructType,
 		Members: []*types.TypeDescriptor{
 			types.UInt64TypeDescriptor,
@@ -76,6 +84,8 @@ var (
 		},
 	}
 	mtlOriginType = &types.TypeDescriptor{
+		Size:      24,
+		Alignment: 8,
 		Kind: types.StructType,
 		Members: []*types.TypeDescriptor{
 			types.UInt64TypeDescriptor,
@@ -84,6 +94,8 @@ var (
 		},
 	}
 	mtlSizeType = &types.TypeDescriptor{
+		Size:      24,
+		Alignment: 8,
 		Kind: types.StructType,
 		Members: []*types.TypeDescriptor{
 			types.UInt64TypeDescriptor,
@@ -92,6 +104,8 @@ var (
 		},
 	}
 	nsRangeType = &types.TypeDescriptor{
+		Size:      16,
+		Alignment: 8,
 		Kind: types.StructType,
 		Members: []*types.TypeDescriptor{
 			types.UInt64TypeDescriptor,
@@ -398,8 +412,7 @@ func NewAutoreleasePool() *AutoreleasePool {
 // Drain drains the autorelease pool.
 func (p *AutoreleasePool) Drain() {
 	if p.pool != 0 {
-		_ = MsgSend(p.pool, Sel("drain"))
-		// msgSendVoid(p.pool, Sel("drain"))
+		msgSendVoid(p.pool, Sel("drain"))
 		p.pool = 0
 	}
 }

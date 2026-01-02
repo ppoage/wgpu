@@ -183,6 +183,7 @@ func (q *Queue) WriteTexture(dst *hal.ImageCopyTexture, data []byte, layout *hal
 	}
 	_ = q.Submit([]hal.CommandBuffer{cmdBuffer}, nil, 0)
 	if cb, ok := cmdBuffer.(*CommandBuffer); ok && cb != nil {
+		_ = MsgSend(cb.raw, Sel("waitUntilCompleted"))
 		cb.Destroy()
 	}
 }

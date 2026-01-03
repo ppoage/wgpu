@@ -293,6 +293,24 @@ func blendOperationToMTL(op types.BlendOperation) MTLBlendOperation {
 	}
 }
 
+// colorWriteMaskToMTL converts WebGPU color write mask to Metal color write mask.
+func colorWriteMaskToMTL(mask types.ColorWriteMask) MTLColorWriteMask {
+	var out MTLColorWriteMask
+	if mask&types.ColorWriteMaskRed != 0 {
+		out |= MTLColorWriteMaskRed
+	}
+	if mask&types.ColorWriteMaskGreen != 0 {
+		out |= MTLColorWriteMaskGreen
+	}
+	if mask&types.ColorWriteMaskBlue != 0 {
+		out |= MTLColorWriteMaskBlue
+	}
+	if mask&types.ColorWriteMaskAlpha != 0 {
+		out |= MTLColorWriteMaskAlpha
+	}
+	return out
+}
+
 // loadOpToMTL converts WebGPU load operation to Metal load action.
 func loadOpToMTL(op types.LoadOp) MTLLoadAction {
 	switch op {

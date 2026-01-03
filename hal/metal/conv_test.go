@@ -75,3 +75,79 @@ func TestVertexStepModeToMTL(t *testing.T) {
 		t.Fatal("vertexStepModeToMTL(invalid) ok=true, want false")
 	}
 }
+
+func TestBlendFactorToMTL(t *testing.T) {
+	cases := []struct {
+		factor types.BlendFactor
+		want   MTLBlendFactor
+	}{
+		{types.BlendFactorZero, MTLBlendFactorZero},
+		{types.BlendFactorOne, MTLBlendFactorOne},
+		{types.BlendFactorSrc, MTLBlendFactorSourceColor},
+		{types.BlendFactorOneMinusSrc, MTLBlendFactorOneMinusSourceColor},
+		{types.BlendFactorSrcAlpha, MTLBlendFactorSourceAlpha},
+		{types.BlendFactorOneMinusSrcAlpha, MTLBlendFactorOneMinusSourceAlpha},
+		{types.BlendFactorDst, MTLBlendFactorDestinationColor},
+		{types.BlendFactorOneMinusDst, MTLBlendFactorOneMinusDestinationColor},
+		{types.BlendFactorDstAlpha, MTLBlendFactorDestinationAlpha},
+		{types.BlendFactorOneMinusDstAlpha, MTLBlendFactorOneMinusDestinationAlpha},
+		{types.BlendFactorSrcAlphaSaturated, MTLBlendFactorSourceAlphaSaturated},
+		{types.BlendFactorConstant, MTLBlendFactorBlendColor},
+		{types.BlendFactorOneMinusConstant, MTLBlendFactorOneMinusBlendColor},
+	}
+
+	for _, c := range cases {
+		if got := blendFactorToMTL(c.factor); got != c.want {
+			t.Fatalf("blendFactorToMTL(%v)=%v, want %v", c.factor, got, c.want)
+		}
+	}
+
+	if got := blendFactorToMTL(types.BlendFactor(0xff)); got != MTLBlendFactorOne {
+		t.Fatalf("blendFactorToMTL(invalid)=%v, want %v", got, MTLBlendFactorOne)
+	}
+}
+
+func TestBlendOperationToMTL(t *testing.T) {
+	cases := []struct {
+		op   types.BlendOperation
+		want MTLBlendOperation
+	}{
+		{types.BlendOperationAdd, MTLBlendOperationAdd},
+		{types.BlendOperationSubtract, MTLBlendOperationSubtract},
+		{types.BlendOperationReverseSubtract, MTLBlendOperationReverseSubtract},
+		{types.BlendOperationMin, MTLBlendOperationMin},
+		{types.BlendOperationMax, MTLBlendOperationMax},
+	}
+
+	for _, c := range cases {
+		if got := blendOperationToMTL(c.op); got != c.want {
+			t.Fatalf("blendOperationToMTL(%v)=%v, want %v", c.op, got, c.want)
+		}
+	}
+
+	if got := blendOperationToMTL(types.BlendOperation(0xff)); got != MTLBlendOperationAdd {
+		t.Fatalf("blendOperationToMTL(invalid)=%v, want %v", got, MTLBlendOperationAdd)
+	}
+}
+
+func TestColorWriteMaskToMTL(t *testing.T) {
+	cases := []struct {
+		mask types.ColorWriteMask
+		want MTLColorWriteMask
+	}{
+		{0, 0},
+		{types.ColorWriteMaskRed, MTLColorWriteMaskRed},
+		{types.ColorWriteMaskGreen, MTLColorWriteMaskGreen},
+		{types.ColorWriteMaskBlue, MTLColorWriteMaskBlue},
+		{types.ColorWriteMaskAlpha, MTLColorWriteMaskAlpha},
+		{types.ColorWriteMaskRed | types.ColorWriteMaskGreen, MTLColorWriteMaskRed | MTLColorWriteMaskGreen},
+		{types.ColorWriteMaskBlue | types.ColorWriteMaskAlpha, MTLColorWriteMaskBlue | MTLColorWriteMaskAlpha},
+		{types.ColorWriteMaskAll, MTLColorWriteMaskRed | MTLColorWriteMaskGreen | MTLColorWriteMaskBlue | MTLColorWriteMaskAlpha},
+	}
+
+	for _, c := range cases {
+		if got := colorWriteMaskToMTL(c.mask); got != c.want {
+			t.Fatalf("colorWriteMaskToMTL(%v)=%v, want %v", c.mask, got, c.want)
+		}
+	}
+}

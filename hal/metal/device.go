@@ -517,7 +517,6 @@ func (d *Device) CreateShaderModule(desc *hal.ShaderModuleDescriptor) (hal.Shade
 
 		// Create NSString from MSL source
 		mslString := NSString(mslSource)
-		defer Release(mslString)
 
 		// Create MTLLibrary from source
 		// MTLLibrary* newLibraryWithSource:options:error:
@@ -619,7 +618,6 @@ func (d *Device) compileLibraryForPipeline(module *ShaderModule, layout *Pipelin
 	}
 
 	mslString := NSString(mslSource)
-	defer Release(mslString)
 
 	var errorPtr ID
 	library := MsgSend(d.raw, Sel("newLibraryWithSource:options:error:"),
@@ -777,13 +775,11 @@ func (d *Device) CreateRenderPipeline(desc *hal.RenderPipelineDescriptor) (hal.R
 	if desc.Label != "" {
 		label := NSString(desc.Label)
 		_ = MsgSend(pipelineDesc, Sel("setLabel:"), uintptr(label))
-		Release(label)
 	}
 
 	// Get vertex function from library
 	vertexFuncName := NSString(desc.Vertex.EntryPoint)
 	vertexFunc := MsgSend(vertexCompiled.library, Sel("newFunctionWithName:"), uintptr(vertexFuncName))
-	Release(vertexFuncName)
 	if vertexFunc == 0 {
 		return nil, fmt.Errorf("metal: vertex function '%s' not found", desc.Vertex.EntryPoint)
 	}
@@ -843,7 +839,6 @@ func (d *Device) CreateRenderPipeline(desc *hal.RenderPipelineDescriptor) (hal.R
 	if fragmentModule != nil && desc.Fragment != nil {
 		fragmentFuncName := NSString(desc.Fragment.EntryPoint)
 		fragmentFunc := MsgSend(fragmentCompiled.library, Sel("newFunctionWithName:"), uintptr(fragmentFuncName))
-		Release(fragmentFuncName)
 		if fragmentFunc == 0 {
 			return nil, fmt.Errorf("metal: fragment function '%s' not found", desc.Fragment.EntryPoint)
 		}
@@ -864,7 +859,7 @@ func (d *Device) CreateRenderPipeline(desc *hal.RenderPipelineDescriptor) (hal.R
 			_ = MsgSend(attachment, Sel("setPixelFormat:"), uintptr(pixelFormat))
 
 			// Set write mask
-			_ = MsgSend(attachment, Sel("setWriteMask:"), uintptr(target.WriteMask))
+			_ = MsgSend(attachment, Sel("setWriteMask:"), uintptr(colorWriteMaskToMTL(target.WriteMask)))
 
 			// Configure blending if present
 			if target.Blend != nil {
@@ -945,7 +940,6 @@ func (d *Device) CreateComputePipeline(desc *hal.ComputePipelineDescriptor) (hal
 	// Get compute function from library
 	funcName := NSString(desc.Compute.EntryPoint)
 	computeFunc := MsgSend(compiled.library, Sel("newFunctionWithName:"), uintptr(funcName))
-	Release(funcName)
 	if computeFunc == 0 {
 		return nil, fmt.Errorf("metal: compute function '%s' not found", desc.Compute.EntryPoint)
 	}

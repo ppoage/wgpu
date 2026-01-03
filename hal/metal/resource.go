@@ -19,6 +19,11 @@ type Buffer struct {
 	device  *Device
 }
 
+// Raw returns the underlying Metal buffer object.
+func (b *Buffer) Raw() ID {
+	return b.raw
+}
+
 // Destroy releases the buffer.
 func (b *Buffer) Destroy() {
 	if b.device != nil {
@@ -63,6 +68,11 @@ type TextureView struct {
 	device  *Device
 }
 
+// Raw returns the underlying Metal texture view object.
+func (v *TextureView) Raw() ID {
+	return v.raw
+}
+
 // Destroy releases the texture view.
 func (v *TextureView) Destroy() {
 	if v.device != nil {
@@ -74,6 +84,11 @@ func (v *TextureView) Destroy() {
 type Sampler struct {
 	raw    ID // id<MTLSamplerState>
 	device *Device
+}
+
+// Raw returns the underlying Metal sampler object.
+func (s *Sampler) Raw() ID {
+	return s.raw
 }
 
 // Destroy releases the sampler.

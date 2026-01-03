@@ -100,7 +100,12 @@ func (e *CommandEncoder) ClearBuffer(buffer hal.Buffer, offset, size uint64) {
 	if blitEncoder == 0 {
 		return
 	}
-	_ = MsgSend(blitEncoder, Sel("fillBuffer:range:value:"), uintptr(buf.raw), uintptr(offset), uintptr(size), uintptr(0))
+	msgSendVoid(blitEncoder, Sel("fillBuffer:range:value:"),
+		argPointer(uintptr(buf.raw)),
+		argUint64(offset),
+		argUint64(size),
+		argUint64(0),
+	)
 	_ = MsgSend(blitEncoder, Sel("endEncoding"))
 }
 
@@ -122,8 +127,13 @@ func (e *CommandEncoder) CopyBufferToBuffer(src, dst hal.Buffer, regions []hal.B
 		return
 	}
 	for _, region := range regions {
-		_ = MsgSend(blitEncoder, Sel("copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:"),
-			uintptr(srcBuf.raw), uintptr(region.SrcOffset), uintptr(dstBuf.raw), uintptr(region.DstOffset), uintptr(region.Size))
+		msgSendVoid(blitEncoder, Sel("copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:"),
+			argPointer(uintptr(srcBuf.raw)),
+			argUint64(region.SrcOffset),
+			argPointer(uintptr(dstBuf.raw)),
+			argUint64(region.DstOffset),
+			argUint64(region.Size),
+		)
 	}
 	_ = MsgSend(blitEncoder, Sel("endEncoding"))
 }
@@ -259,12 +269,12 @@ func (e *CommandEncoder) BeginRenderPass(desc *hal.RenderPassDescriptor) hal.Ren
 		if tv, ok := ca.View.(*TextureView); ok && tv != nil {
 			_ = MsgSend(attachment, Sel("setTexture:"), uintptr(tv.raw))
 		}
-		_ = MsgSend(attachment, Sel("setLoadAction:"), uintptr(loadOpToMTL(ca.LoadOp)))
+		msgSendVoid(attachment, Sel("setLoadAction:"), argUint64(uint64(loadOpToMTL(ca.LoadOp))))
 		if ca.LoadOp == types.LoadOpClear {
 			clearColor := MTLClearColor{Red: ca.ClearValue.R, Green: ca.ClearValue.G, Blue: ca.ClearValue.B, Alpha: ca.ClearValue.A}
 			msgSendClearColor(attachment, Sel("setClearColor:"), clearColor)
 		}
-		_ = MsgSend(attachment, Sel("setStoreAction:"), uintptr(storeOpToMTL(ca.StoreOp)))
+		msgSendVoid(attachment, Sel("setStoreAction:"), argUint64(uint64(storeOpToMTL(ca.StoreOp))))
 		if ca.ResolveTarget != nil {
 			if rtv, ok := ca.ResolveTarget.(*TextureView); ok && rtv != nil {
 				_ = MsgSend(attachment, Sel("setResolveTexture:"), uintptr(rtv.raw))
@@ -277,8 +287,8 @@ func (e *CommandEncoder) BeginRenderPass(desc *hal.RenderPassDescriptor) hal.Ren
 		if tv, ok := dsa.View.(*TextureView); ok && tv != nil {
 			_ = MsgSend(depthAttachment, Sel("setTexture:"), uintptr(tv.raw))
 		}
-		_ = MsgSend(depthAttachment, Sel("setLoadAction:"), uintptr(loadOpToMTL(dsa.DepthLoadOp)))
-		_ = MsgSend(depthAttachment, Sel("setStoreAction:"), uintptr(storeOpToMTL(dsa.DepthStoreOp)))
+		msgSendVoid(depthAttachment, Sel("setLoadAction:"), argUint64(uint64(loadOpToMTL(dsa.DepthLoadOp))))
+		msgSendVoid(depthAttachment, Sel("setStoreAction:"), argUint64(uint64(storeOpToMTL(dsa.DepthStoreOp))))
 	}
 	encoder := MsgSend(e.cmdBuffer, Sel("renderCommandEncoderWithDescriptor:"), uintptr(rpDesc))
 	if encoder == 0 {
@@ -387,7 +397,7 @@ func (e *RenderPassEncoder) SetBindGroup(index uint32, group hal.BindGroup, offs
 		if !ok {
 			continue
 		}
-		if info.visibility&types.ShaderStageCompute == 0 {
+		if info.visibility&(types.ShaderStageVertex|types.ShaderStageFragment) == 0 {
 			continue
 		}
 
@@ -403,34 +413,48 @@ func (e *RenderPassEncoder) SetBindGroup(index uint32, group hal.BindGroup, offs
 			buffer := ID(res.Buffer)
 			offset := res.Offset + dynamicOffset
 			if info.visibility&types.ShaderStageVertex != 0 {
-				_ = MsgSend(e.raw, Sel("setVertexBuffer:offset:atIndex:"),
-					uintptr(buffer), uintptr(offset), uintptr(groupOffsets.buffer+info.index))
+				msgSendVoid(e.raw, Sel("setVertexBuffer:offset:atIndex:"),
+					argPointer(uintptr(buffer)),
+					argUint64(offset),
+					argUint64(uint64(groupOffsets.buffer+info.index)),
+				)
 			}
 			if info.visibility&types.ShaderStageFragment != 0 {
-				_ = MsgSend(e.raw, Sel("setFragmentBuffer:offset:atIndex:"),
-					uintptr(buffer), uintptr(offset), uintptr(groupOffsets.buffer+info.index))
+				msgSendVoid(e.raw, Sel("setFragmentBuffer:offset:atIndex:"),
+					argPointer(uintptr(buffer)),
+					argUint64(offset),
+					argUint64(uint64(groupOffsets.buffer+info.index)),
+				)
 			}
 
 		case types.TextureViewBinding:
 			texture := ID(res.TextureView)
 			if info.visibility&types.ShaderStageVertex != 0 {
-				_ = MsgSend(e.raw, Sel("setVertexTexture:atIndex:"),
-					uintptr(texture), uintptr(groupOffsets.texture+info.index))
+				msgSendVoid(e.raw, Sel("setVertexTexture:atIndex:"),
+					argPointer(uintptr(texture)),
+					argUint64(uint64(groupOffsets.texture+info.index)),
+				)
 			}
 			if info.visibility&types.ShaderStageFragment != 0 {
-				_ = MsgSend(e.raw, Sel("setFragmentTexture:atIndex:"),
-					uintptr(texture), uintptr(groupOffsets.texture+info.index))
+				msgSendVoid(e.raw, Sel("setFragmentTexture:atIndex:"),
+					argPointer(uintptr(texture)),
+					argUint64(uint64(groupOffsets.texture+info.index)),
+				)
 			}
 
 		case types.SamplerBinding:
 			sampler := ID(res.Sampler)
 			if info.visibility&types.ShaderStageVertex != 0 {
-				_ = MsgSend(e.raw, Sel("setVertexSamplerState:atIndex:"),
-					uintptr(sampler), uintptr(groupOffsets.sampler+info.index))
+				msgSendVoid(e.raw, Sel("setVertexSamplerState:atIndex:"),
+					argPointer(uintptr(sampler)),
+					argUint64(uint64(groupOffsets.sampler+info.index)),
+				)
 			}
 			if info.visibility&types.ShaderStageFragment != 0 {
-				_ = MsgSend(e.raw, Sel("setFragmentSamplerState:atIndex:"),
-					uintptr(sampler), uintptr(groupOffsets.sampler+info.index))
+				msgSendVoid(e.raw, Sel("setFragmentSamplerState:atIndex:"),
+					argPointer(uintptr(sampler)),
+					argUint64(uint64(groupOffsets.sampler+info.index)),
+				)
 			}
 		}
 	}
@@ -442,7 +466,11 @@ func (e *RenderPassEncoder) SetVertexBuffer(slot uint32, buffer hal.Buffer, offs
 	if !ok || buf == nil {
 		return
 	}
-	_ = MsgSend(e.raw, Sel("setVertexBuffer:offset:atIndex:"), uintptr(buf.raw), uintptr(offset), uintptr(slot))
+	msgSendVoid(e.raw, Sel("setVertexBuffer:offset:atIndex:"),
+		argPointer(uintptr(buf.raw)),
+		argUint64(offset),
+		argUint64(uint64(slot)),
+	)
 }
 
 // SetIndexBuffer sets the index buffer.
@@ -483,13 +511,18 @@ func (e *RenderPassEncoder) SetBlendConstant(color *types.Color) {
 
 // SetStencilReference sets the stencil reference value.
 func (e *RenderPassEncoder) SetStencilReference(ref uint32) {
-	_ = MsgSend(e.raw, Sel("setStencilReferenceValue:"), uintptr(ref))
+	msgSendVoid(e.raw, Sel("setStencilReferenceValue:"), argUint64(uint64(ref)))
 }
 
 // Draw draws primitives.
 func (e *RenderPassEncoder) Draw(vertexCount, instanceCount, firstVertex, firstInstance uint32) {
-	_ = MsgSend(e.raw, Sel("drawPrimitives:vertexStart:vertexCount:instanceCount:baseInstance:"),
-		uintptr(MTLPrimitiveTypeTriangle), uintptr(firstVertex), uintptr(vertexCount), uintptr(instanceCount), uintptr(firstInstance))
+	msgSendVoid(e.raw, Sel("drawPrimitives:vertexStart:vertexCount:instanceCount:baseInstance:"),
+		argUint64(uint64(MTLPrimitiveTypeTriangle)),
+		argUint64(uint64(firstVertex)),
+		argUint64(uint64(vertexCount)),
+		argUint64(uint64(instanceCount)),
+		argUint64(uint64(firstInstance)),
+	)
 }
 
 // DrawIndexed draws indexed primitives.
@@ -503,9 +536,16 @@ func (e *RenderPassEncoder) DrawIndexed(indexCount, instanceCount, firstIndex ui
 		indexSize = 4
 	}
 	offset := e.indexOffset + uint64(firstIndex)*uint64(indexSize)
-	_ = MsgSend(e.raw, Sel("drawIndexedPrimitives:indexCount:indexType:indexBuffer:indexBufferOffset:instanceCount:baseVertex:baseInstance:"),
-		uintptr(MTLPrimitiveTypeTriangle), uintptr(indexCount), uintptr(indexType),
-		uintptr(e.indexBuffer.raw), uintptr(offset), uintptr(instanceCount), uintptr(baseVertex), uintptr(firstInstance))
+	msgSendVoid(e.raw, Sel("drawIndexedPrimitives:indexCount:indexType:indexBuffer:indexBufferOffset:instanceCount:baseVertex:baseInstance:"),
+		argUint64(uint64(MTLPrimitiveTypeTriangle)),
+		argUint64(uint64(indexCount)),
+		argUint64(uint64(indexType)),
+		argPointer(uintptr(e.indexBuffer.raw)),
+		argUint64(offset),
+		argUint64(uint64(instanceCount)),
+		argInt64(int64(baseVertex)),
+		argUint64(uint64(firstInstance)),
+	)
 }
 
 // DrawIndirect draws primitives with GPU-generated parameters.
@@ -514,8 +554,11 @@ func (e *RenderPassEncoder) DrawIndirect(buffer hal.Buffer, offset uint64) {
 	if !ok || buf == nil {
 		return
 	}
-	_ = MsgSend(e.raw, Sel("drawPrimitives:indirectBuffer:indirectBufferOffset:"),
-		uintptr(MTLPrimitiveTypeTriangle), uintptr(buf.raw), uintptr(offset))
+	msgSendVoid(e.raw, Sel("drawPrimitives:indirectBuffer:indirectBufferOffset:"),
+		argUint64(uint64(MTLPrimitiveTypeTriangle)),
+		argPointer(uintptr(buf.raw)),
+		argUint64(offset),
+	)
 }
 
 // DrawIndexedIndirect draws indexed primitives with GPU-generated parameters.
@@ -525,8 +568,14 @@ func (e *RenderPassEncoder) DrawIndexedIndirect(buffer hal.Buffer, offset uint64
 		return
 	}
 	indexType := indexFormatToMTL(e.indexFormat)
-	_ = MsgSend(e.raw, Sel("drawIndexedPrimitives:indexType:indexBuffer:indexBufferOffset:indirectBuffer:indirectBufferOffset:"),
-		uintptr(MTLPrimitiveTypeTriangle), uintptr(indexType), uintptr(e.indexBuffer.raw), uintptr(e.indexOffset), uintptr(buf.raw), uintptr(offset))
+	msgSendVoid(e.raw, Sel("drawIndexedPrimitives:indexType:indexBuffer:indexBufferOffset:indirectBuffer:indirectBufferOffset:"),
+		argUint64(uint64(MTLPrimitiveTypeTriangle)),
+		argUint64(uint64(indexType)),
+		argPointer(uintptr(e.indexBuffer.raw)),
+		argUint64(e.indexOffset),
+		argPointer(uintptr(buf.raw)),
+		argUint64(offset),
+	)
 }
 
 // ExecuteBundle executes a pre-recorded render bundle.
@@ -594,18 +643,25 @@ func (e *ComputePassEncoder) SetBindGroup(index uint32, group hal.BindGroup, off
 		case types.BufferBinding:
 			buffer := ID(res.Buffer)
 			offset := res.Offset + dynamicOffset
-			_ = MsgSend(e.raw, Sel("setBuffer:offset:atIndex:"),
-				uintptr(buffer), uintptr(offset), uintptr(groupOffsets.buffer+info.index))
+			msgSendVoid(e.raw, Sel("setBuffer:offset:atIndex:"),
+				argPointer(uintptr(buffer)),
+				argUint64(offset),
+				argUint64(uint64(groupOffsets.buffer+info.index)),
+			)
 
 		case types.TextureViewBinding:
 			texture := ID(res.TextureView)
-			_ = MsgSend(e.raw, Sel("setTexture:atIndex:"),
-				uintptr(texture), uintptr(groupOffsets.texture+info.index))
+			msgSendVoid(e.raw, Sel("setTexture:atIndex:"),
+				argPointer(uintptr(texture)),
+				argUint64(uint64(groupOffsets.texture+info.index)),
+			)
 
 		case types.SamplerBinding:
 			sampler := ID(res.Sampler)
-			_ = MsgSend(e.raw, Sel("setSamplerState:atIndex:"),
-				uintptr(sampler), uintptr(groupOffsets.sampler+info.index))
+			msgSendVoid(e.raw, Sel("setSamplerState:atIndex:"),
+				argPointer(uintptr(sampler)),
+				argUint64(uint64(groupOffsets.sampler+info.index)),
+			)
 		}
 	}
 }

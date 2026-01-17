@@ -54,15 +54,70 @@ func (q *Queue) WriteBuffer(buffer hal.Buffer, offset uint64, data []byte) {
 	if !ok || buf == nil {
 		return
 	}
-
-	ptr := buf.Contents()
-	if ptr == 0 {
-		return // Buffer is not mappable
+	if len(data) == 0 {
+		return
+	}
+	if offset >= buf.size {
+		return
+	}
+	if uint64(len(data)) > buf.size-offset {
+		return
 	}
 
-	// Copy data using unsafe
-	dst := unsafe.Slice((*byte)(unsafe.Pointer(ptr+uintptr(offset))), len(data))
-	copy(dst, data)
+	ptr := buf.Contents()
+	if ptr != 0 {
+		// Copy data using unsafe for mapped buffers.
+		dst := unsafe.Slice((*byte)(unsafe.Pointer(ptr+uintptr(offset))), len(data))
+		copy(dst, data)
+		return
+	}
+
+	if buf.usage&types.BufferUsageCopyDst == 0 {
+		return
+	}
+
+	staging, err := q.device.CreateBuffer(&hal.BufferDescriptor{
+		Label: "buffer-write-staging",
+		Size:  uint64(len(data)),
+		Usage: types.BufferUsageCopySrc | types.BufferUsageMapWrite,
+	})
+	if err != nil {
+		return
+	}
+	defer q.device.DestroyBuffer(staging)
+
+	stagingBuf, ok := staging.(*Buffer)
+	if !ok || stagingBuf == nil {
+		return
+	}
+	stagingPtr := stagingBuf.Contents()
+	if stagingPtr == 0 {
+		return
+	}
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(stagingPtr)), len(data)), data)
+
+	encoder, err := q.device.CreateCommandEncoder(&hal.CommandEncoderDescriptor{
+		Label: "buffer-write-encoder",
+	})
+	if err != nil {
+		return
+	}
+	encoder.CopyBufferToBuffer(staging, buffer, []hal.BufferCopy{
+		{
+			SrcOffset: 0,
+			DstOffset: offset,
+			Size:      uint64(len(data)),
+		},
+	})
+	cmdBuffer, err := encoder.EndEncoding()
+	if err != nil {
+		return
+	}
+	_ = q.Submit([]hal.CommandBuffer{cmdBuffer}, nil, 0)
+	if cb, ok := cmdBuffer.(*CommandBuffer); ok && cb != nil {
+		_ = MsgSend(cb.raw, Sel("waitUntilCompleted"))
+		cb.Destroy()
+	}
 }
 
 // WriteTexture writes data to a texture immediately.

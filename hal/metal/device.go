@@ -586,6 +586,7 @@ type compiledLibrary struct {
 	library        ID
 	workgroupSizes map[string][3]uint32
 	mslSource      string
+	entryPointMap  map[string]string
 }
 
 func (d *Device) compileLibraryForPipeline(module *ShaderModule, layout *PipelineLayout) (*compiledLibrary, error) {
@@ -612,7 +613,7 @@ func (d *Device) compileLibraryForPipeline(module *ShaderModule, layout *Pipelin
 
 	workgroupSizes := extractWorkgroupSizes(irModule)
 
-	mslSource, _, err := msl.Compile(irModule, msl.DefaultOptions())
+	mslSource, info, err := msl.Compile(irModule, msl.DefaultOptions())
 	if err != nil {
 		return nil, fmt.Errorf("metal: failed to compile to MSL: %w", err)
 	}
@@ -636,7 +637,18 @@ func (d *Device) compileLibraryForPipeline(module *ShaderModule, layout *Pipelin
 		library:        library,
 		workgroupSizes: workgroupSizes,
 		mslSource:      mslSource,
+		entryPointMap:  info.EntryPointNames,
 	}, nil
+}
+
+func entryPointName(m map[string]string, name string) string {
+	if m == nil {
+		return name
+	}
+	if mapped, ok := m[name]; ok && mapped != "" {
+		return mapped
+	}
+	return name
 }
 
 func remapModuleBindings(module *ir.Module, layout *PipelineLayout) error {
@@ -778,7 +790,8 @@ func (d *Device) CreateRenderPipeline(desc *hal.RenderPipelineDescriptor) (hal.R
 	}
 
 	// Get vertex function from library
-	vertexFuncName := NSString(desc.Vertex.EntryPoint)
+	vertexEntry := entryPointName(vertexCompiled.entryPointMap, desc.Vertex.EntryPoint)
+	vertexFuncName := NSString(vertexEntry)
 	vertexFunc := MsgSend(vertexCompiled.library, Sel("newFunctionWithName:"), uintptr(vertexFuncName))
 	if vertexFunc == 0 {
 		return nil, fmt.Errorf("metal: vertex function '%s' not found", desc.Vertex.EntryPoint)
@@ -837,7 +850,8 @@ func (d *Device) CreateRenderPipeline(desc *hal.RenderPipelineDescriptor) (hal.R
 
 	// Get and set fragment function if present
 	if fragmentModule != nil && desc.Fragment != nil {
-		fragmentFuncName := NSString(desc.Fragment.EntryPoint)
+		fragmentEntry := entryPointName(fragmentCompiled.entryPointMap, desc.Fragment.EntryPoint)
+		fragmentFuncName := NSString(fragmentEntry)
 		fragmentFunc := MsgSend(fragmentCompiled.library, Sel("newFunctionWithName:"), uintptr(fragmentFuncName))
 		if fragmentFunc == 0 {
 			return nil, fmt.Errorf("metal: fragment function '%s' not found", desc.Fragment.EntryPoint)
@@ -938,7 +952,8 @@ func (d *Device) CreateComputePipeline(desc *hal.ComputePipelineDescriptor) (hal
 	defer Release(compiled.library)
 
 	// Get compute function from library
-	funcName := NSString(desc.Compute.EntryPoint)
+	computeEntry := entryPointName(compiled.entryPointMap, desc.Compute.EntryPoint)
+	funcName := NSString(computeEntry)
 	computeFunc := MsgSend(compiled.library, Sel("newFunctionWithName:"), uintptr(funcName))
 	if computeFunc == 0 {
 		return nil, fmt.Errorf("metal: compute function '%s' not found", desc.Compute.EntryPoint)

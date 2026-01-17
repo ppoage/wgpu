@@ -6,7 +6,9 @@
 package metal
 
 import (
+	"fmt"
 	"math"
+	"os"
 	"testing"
 	"unsafe"
 
@@ -216,7 +218,7 @@ func TestRenderPassTriangleReadback(t *testing.T) {
 			Module:     module,
 			EntryPoint: "fs_main",
 			Targets: []types.ColorTargetState{
-				{Format: types.TextureFormatBGRA8Unorm},
+				{Format: types.TextureFormatBGRA8Unorm, WriteMask: types.ColorWriteMaskAll},
 			},
 		},
 	})
@@ -233,7 +235,7 @@ func TestRenderPassTriangleReadback(t *testing.T) {
 	vbo, err := device.CreateBuffer(&hal.BufferDescriptor{
 		Label: "triangle-vertices",
 		Size:  uint64(len(vertices)) * 4,
-		Usage: types.BufferUsageVertex | types.BufferUsageMapWrite,
+		Usage: types.BufferUsageVertex | types.BufferUsageCopyDst,
 	})
 	if err != nil {
 		t.Fatalf("CreateBuffer failed: %v", err)
@@ -391,7 +393,7 @@ func TestRenderPassTexturedQuadReadback(t *testing.T) {
 			Module:     module,
 			EntryPoint: "fs_main",
 			Targets: []types.ColorTargetState{
-				{Format: types.TextureFormatBGRA8Unorm},
+				{Format: types.TextureFormatBGRA8Unorm, WriteMask: types.ColorWriteMaskAll},
 			},
 		},
 	})
@@ -411,7 +413,7 @@ func TestRenderPassTexturedQuadReadback(t *testing.T) {
 	vbo, err := device.CreateBuffer(&hal.BufferDescriptor{
 		Label: "quad-vertices",
 		Size:  uint64(len(vertices)) * 4,
-		Usage: types.BufferUsageVertex | types.BufferUsageMapWrite,
+		Usage: types.BufferUsageVertex | types.BufferUsageCopyDst,
 	})
 	if err != nil {
 		t.Fatalf("CreateBuffer failed: %v", err)
@@ -422,7 +424,7 @@ func TestRenderPassTexturedQuadReadback(t *testing.T) {
 	ibo, err := device.CreateBuffer(&hal.BufferDescriptor{
 		Label: "quad-indices",
 		Size:  uint64(len(indices)) * 2,
-		Usage: types.BufferUsageIndex | types.BufferUsageMapWrite,
+		Usage: types.BufferUsageIndex | types.BufferUsageCopyDst,
 	})
 	if err != nil {
 		t.Fatalf("CreateBuffer failed: %v", err)
@@ -434,7 +436,7 @@ func TestRenderPassTexturedQuadReadback(t *testing.T) {
 	ubo, err := device.CreateBuffer(&hal.BufferDescriptor{
 		Label: "tint-uniform",
 		Size:  uint64(len(tint)) * 4,
-		Usage: types.BufferUsageUniform | types.BufferUsageMapWrite,
+		Usage: types.BufferUsageUniform | types.BufferUsageCopyDst,
 	})
 	if err != nil {
 		t.Fatalf("CreateBuffer failed: %v", err)
@@ -636,6 +638,19 @@ func TestComputePipelineDispatchWritesBuffer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateComputePipeline failed: %v", err)
 	}
+	mtlPipeline, ok := pipeline.(*ComputePipeline)
+	if !ok || mtlPipeline == nil {
+		t.Fatal("CreateComputePipeline returned nil or non-metal pipeline")
+	}
+	if mtlPipeline.raw == 0 {
+		t.Fatal("ComputePipeline raw handle is nil")
+	}
+	if mtlPipeline.layout == nil || mtlPipeline.layout != layout {
+		t.Fatal("ComputePipeline layout mismatch or nil")
+	}
+	if mtlPipeline.workgroupSize.Width == 0 || mtlPipeline.workgroupSize.Height == 0 || mtlPipeline.workgroupSize.Depth == 0 {
+		t.Fatalf("ComputePipeline workgroup size invalid: %+v", mtlPipeline.workgroupSize)
+	}
 	defer device.DestroyComputePipeline(pipeline)
 
 	buffer, err := device.CreateBuffer(&hal.BufferDescriptor{
@@ -646,6 +661,16 @@ func TestComputePipelineDispatchWritesBuffer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateBuffer failed: %v", err)
 	}
+	mtlBuffer, ok := buffer.(*Buffer)
+	if !ok || mtlBuffer == nil {
+		t.Fatal("CreateBuffer returned nil or non-metal buffer")
+	}
+	if mtlBuffer.raw == 0 {
+		t.Fatal("Buffer raw handle is nil")
+	}
+	if mtlBuffer.size != 16 {
+		t.Fatalf("Buffer size mismatch: got %d want 16", mtlBuffer.size)
+	}
 	defer device.DestroyBuffer(buffer)
 
 	bindGroup, err := device.CreateBindGroup(&hal.BindGroupDescriptor{
@@ -654,12 +679,19 @@ func TestComputePipelineDispatchWritesBuffer(t *testing.T) {
 		Entries: []types.BindGroupEntry{
 			{
 				Binding:  0,
-				Resource: types.BufferBinding{Buffer: types.BufferHandle(buffer.(*Buffer).raw), Offset: 0, Size: 16},
+				Resource: types.BufferBinding{Buffer: types.BufferHandle(mtlBuffer.raw), Offset: 0, Size: 16},
 			},
 		},
 	})
 	if err != nil {
 		t.Fatalf("CreateBindGroup failed: %v", err)
+	}
+	mtlBindGroup, ok := bindGroup.(*BindGroup)
+	if !ok || mtlBindGroup == nil {
+		t.Fatal("CreateBindGroup returned nil or non-metal bind group")
+	}
+	if mtlBindGroup.layout == nil || mtlBindGroup.layout != bgl {
+		t.Fatal("BindGroup layout mismatch or nil")
 	}
 	defer device.DestroyBindGroup(bindGroup)
 
@@ -669,8 +701,24 @@ func TestComputePipelineDispatchWritesBuffer(t *testing.T) {
 	}
 
 	pass := encoder.BeginComputePass(&hal.ComputePassDescriptor{})
+	if pass == nil {
+		t.Fatal("BeginComputePass returned nil")
+	}
+	mtlPass, ok := pass.(*ComputePassEncoder)
+	if !ok || mtlPass == nil {
+		t.Fatal("BeginComputePass returned non-metal encoder")
+	}
+	if mtlPass.raw == 0 {
+		t.Fatal("ComputePassEncoder raw handle is nil")
+	}
 	pass.SetPipeline(pipeline)
 	pass.SetBindGroup(0, bindGroup, nil)
+	fmt.Fprintf(os.Stderr, "compute dispatch: passRaw=%#x threadgroups=%+v threadsPerThreadgroup=%+v mtlSizeType=%+v\n",
+		mtlPass.raw,
+		MTLSize{Width: 4, Height: 1, Depth: 1},
+		mtlPipeline.workgroupSize,
+		mtlSizeType,
+	)
 	pass.Dispatch(4, 1, 1)
 	pass.End()
 
@@ -680,15 +728,17 @@ func TestComputePipelineDispatchWritesBuffer(t *testing.T) {
 	}
 	submitAndWait(t, queue, cmd)
 
-	ptr := buffer.(*Buffer).Contents()
+	ptr := mtlBuffer.Contents()
 	if ptr == 0 {
 		t.Fatal("Buffer contents pointer is nil")
 	}
+	t.Logf("compute buffer ptr=%#x workgroup=%+v offsets=%+v",
+		ptr, mtlPipeline.workgroupSize, mtlPipeline.layout.offsets)
 	raw := unsafe.Slice((*uint32)(unsafe.Pointer(ptr)), 4)
 	want := []uint32{1, 4, 7, 10}
 	for i, v := range want {
 		if raw[i] != v {
-			t.Fatalf("buffer[%d] = %d, want %d", i, raw[i], v)
+			t.Fatalf("buffer[%d] = %d, want %d (raw=%v)", i, raw[i], v, raw)
 		}
 	}
 }
@@ -756,7 +806,7 @@ func TestRenderPassBlendConstantReadback(t *testing.T) {
 			Module:     module,
 			EntryPoint: "fs_main",
 			Targets: []types.ColorTargetState{
-				{Format: types.TextureFormatBGRA8Unorm, Blend: blend},
+				{Format: types.TextureFormatBGRA8Unorm, Blend: blend, WriteMask: types.ColorWriteMaskAll},
 			},
 		},
 	})
@@ -773,7 +823,7 @@ func TestRenderPassBlendConstantReadback(t *testing.T) {
 	vbo, err := device.CreateBuffer(&hal.BufferDescriptor{
 		Label: "blend-vertices",
 		Size:  uint64(len(vertices)) * 4,
-		Usage: types.BufferUsageVertex | types.BufferUsageMapWrite,
+		Usage: types.BufferUsageVertex | types.BufferUsageCopyDst,
 	})
 	if err != nil {
 		t.Fatalf("CreateBuffer failed: %v", err)
@@ -831,7 +881,7 @@ func TestRenderPassBlendConstantReadback(t *testing.T) {
 
 	readback, rowStride := readbackTexture(t, device, queue, target, size.Width, size.Height, types.TextureFormatBGRA8Unorm)
 	idx := int(rowStride)*1 + 1*4
-	got := readback[idx+2] // red channel in BGRA
+	got := readback[idx] // blue channel in BGRA
 	if colorDistance(got, 0x80) > 8 {
 		t.Fatalf("blend output mismatch: got %d want ~128", got)
 	}
